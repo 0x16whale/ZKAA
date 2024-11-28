@@ -69,10 +69,15 @@ contract EntryPoint is
      * @param beneficiary - The address to receive the fees.
      * @param amount      - Amount to transfer.
      */
+    // function _compensate(address payable beneficiary, uint256 amount) internal {
+    //     require(beneficiary != address(0), "AA90 invalid beneficiary");
+    //     (bool success, ) = beneficiary.call{value: amount}("");
+    //     require(success, "AA91 failed send to beneficiary");
+    // }
     function _compensate(address payable beneficiary, uint256 amount) internal {
-        require(beneficiary != address(0), "AA90 invalid beneficiary");
+        require(beneficiary != address(0));
         (bool success, ) = beneficiary.call{value: amount}("");
-        require(success, "AA91 failed send to beneficiary");
+        require(success);
     }
 
     /**
@@ -244,9 +249,12 @@ contract EntryPoint is
             IAggregator aggregator = opa.aggregator;
 
             //address(1) is special marker of "signature error"
+            // require(
+            //     address(aggregator) != address(1),
+            //     "AA96 invalid aggregator"
+            // );
             require(
-                address(aggregator) != address(1),
-                "AA96 invalid aggregator"
+                address(aggregator) != address(1)
             );
 
             if (address(aggregator) != address(0)) {
@@ -311,6 +319,7 @@ contract EntryPoint is
     struct MemoryUserOp {
         address sender;
         uint256 nonce;
+        uint64 chainId;
         uint256 verificationGasLimit;
         uint256 callGasLimit;
         uint256 paymasterVerificationGasLimit;
@@ -343,7 +352,8 @@ contract EntryPoint is
         bytes calldata context
     ) external returns (uint256 actualGasCost) {
         uint256 preGas = gasleft();
-        require(msg.sender == address(this), "AA92 internal call only");
+        // require(msg.sender == address(this), "AA92 internal call only");
+        require(msg.sender == address(this));
         MemoryUserOp memory mUserOp = opInfo.mUserOp;
 
         uint256 callGasLimit = mUserOp.callGasLimit;
@@ -411,10 +421,13 @@ contract EntryPoint is
             .unpackUints(userOp.gasFees);
         bytes calldata paymasterAndData = userOp.paymasterAndData;
         if (paymasterAndData.length > 0) {
+            // require(
+            //     paymasterAndData.length >=
+            //         UserOperationLib.PAYMASTER_DATA_OFFSET,
+            //     "AA93 invalid paymasterAndData"
+            // );
             require(
-                paymasterAndData.length >=
-                    UserOperationLib.PAYMASTER_DATA_OFFSET,
-                "AA93 invalid paymasterAndData"
+                paymasterAndData.length >= UserOperationLib.PAYMASTER_DATA_OFFSET
             );
             (
                 mUserOp.paymaster,
@@ -465,11 +478,14 @@ contract EntryPoint is
                 gas: opInfo.mUserOp.verificationGasLimit
             }(initCode);
             if (sender1 == address(0))
-                revert FailedOp(opIndex, "AA13 initCode failed or OOG");
+                // revert FailedOp(opIndex, "AA13 initCode failed or OOG");
+                revert FailedOp(opIndex, "");
             if (sender1 != sender)
-                revert FailedOp(opIndex, "AA14 initCode must return sender");
+                // revert FailedOp(opIndex, "AA14 initCode must return sender");
+                revert FailedOp(opIndex, "");
             if (sender1.code.length == 0)
-                revert FailedOp(opIndex, "AA15 initCode must create sender");
+                // revert FailedOp(opIndex, "AA15 initCode must create sender");
+                revert FailedOp(opIndex, "");
             address factory = address(bytes20(initCode[0:20]));
             emit AccountDeployed(
                 opInfo.userOpHash,
@@ -523,6 +539,11 @@ contract EntryPoint is
             returns (uint256 _validationData) {
                 validationData = _validationData;
             } catch {
+                // revert FailedOpWithRevert(
+                //     opIndex,
+                //     "AA23 reverted",
+                //     Exec.getReturnData(REVERT_REASON_MAX_LEN)
+                // );
                 revert FailedOpWithRevert(
                     opIndex,
                     "AA23 reverted",
@@ -533,7 +554,8 @@ contract EntryPoint is
                 DepositInfo storage senderInfo = deposits[sender];
                 uint256 deposit = senderInfo.deposit;
                 if (requiredPrefund > deposit) {
-                    revert FailedOp(opIndex, "AA21 didn't pay prefund");
+                    // revert FailedOp(opIndex, "AA21 didn't pay prefund");
+                    revert FailedOp(opIndex, "");
                 }
                 senderInfo.deposit = deposit - requiredPrefund;
             }
@@ -577,9 +599,14 @@ contract EntryPoint is
                 context = _context;
                 validationData = _validationData;
             } catch {
+                // revert FailedOpWithRevert(
+                //     opIndex,
+                //     "AA33 reverted",
+                //     Exec.getReturnData(REVERT_REASON_MAX_LEN)
+                // );
                 revert FailedOpWithRevert(
                     opIndex,
-                    "AA33 reverted",
+                    "",
                     Exec.getReturnData(REVERT_REASON_MAX_LEN)
                 );
             }
@@ -678,7 +705,9 @@ contract EntryPoint is
             mUserOp.paymasterPostOpGasLimit |
             mUserOp.maxFeePerGas |
             mUserOp.maxPriorityFeePerGas;
-        require(maxGasValues <= type(uint120).max, "AA94 gas values overflow");
+        // require(maxGasValues <= type(uint120).max, "AA94 gas values overflow");
+        require(maxGasValues <= type(uint120).max);
+
 
         uint256 requiredPreFund = _getRequiredPrefund(mUserOp);
         validationData = _validateAccountPrepayment(
