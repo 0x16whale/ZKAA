@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.8.24;
+pragma solidity >=0.7.0 <=0.8.25;
 
 /**
  * @dev Interface of the ERC165 standard, as defined in the

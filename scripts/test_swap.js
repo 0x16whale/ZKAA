@@ -2,13 +2,18 @@ const hre = require("hardhat");
 
 const ERC20ABI=require("../artifacts/contracts/TestToken.sol/TestToken.json");
 const WETHABI=require("../artifacts/contracts/WETH.sol/WETH9.json");
-const SwapModABI=require("../artifacts/contracts/module/SwapMod.sol/SwapMod.json");
+const VizingSwapABI=require("../artifacts/contracts/uniswap/VizingSwap.sol/VizingSwap.json");
 
 async function main() {
     const [owner] = await hre.ethers.getSigners();
     const provider = ethers.provider;
     console.log("owner:",owner.address);
-
+    const ownerETHBalance=await provider.getBalance(owner.address);
+    console.log("ownerETHBalance:",ownerETHBalance);
+    if(ownerETHBalance<=ethers.parseEther("0.01")){
+      throw("ETH insufficient");
+    }
+    const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
     const baseRouter="0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4";
     
     //TestToken
@@ -35,13 +40,13 @@ async function main() {
     const USDC=new ethers.Contract(USDCAddress, ERC20ABI.abi, owner);
     const USDT=new ethers.Contract(USDTAddress, ERC20ABI.abi, owner);
     const FlyDoge=new ethers.Contract(FlyDogeAddress, ERC20ABI.abi, owner);
-    const VizingSwapAddress="0xeC377f20fBa2B7525417b1a573C10D0fEEAd2B43";
-    const VizingSwap=new ethers.Contract(VizingSwapAddress, SwapModABI.abi, owner);
+    // const VizingSwapAddress="0x28183dEB9dA0e70Ad513aF7a74B70E8aeD9de810";
+    // const VizingSwap=new ethers.Contract(VizingSwapAddress, VizingSwapABI.abi, owner);
 
-    // const vizingSwap=await hre.ethers.getContractFactory("SwapMod");
-    // const VizingSwap=await vizingSwap.deploy(baseRouter);
-    // const VizingSwapAddress=VizingSwap.target;
-    // console.log("VizingSwap Address:", VizingSwapAddress);
+    const vizingSwap=await hre.ethers.getContractFactory("VizingSwap");
+    const VizingSwap=await vizingSwap.deploy(baseRouter, WETHAddress);
+    const VizingSwapAddress=VizingSwap.target;
+    console.log("VizingSwap Address:", VizingSwapAddress);
 
     //Approve
     const approveMax=ethers.parseEther("10000000000");
@@ -68,9 +73,8 @@ async function main() {
     await Approve(FlyDogeAddress);
 
     //v3 swap eth=>other
-    const ADDRESS_ZERO="0x0000000000000000000000000000000000000000";
 
-    async function V3Swap(token0, token1, amountIn){
+    async function V3SwapToNonETH(token0, token1, amountIn){
       try{
         const v3ExactInputParams={
             index: 0, 
@@ -88,15 +92,61 @@ async function main() {
         }else{
           ethValue = 0;
         }
-        const v3ETHSwapToOther=await VizingSwap.v3ExactInputSingle(v3ExactInputParams, {value: ethValue});
+        const v3ETHSwapToOther=await VizingSwap.v3SwapToNonETH(v3ExactInputParams, {value: ethValue});
         const v3ETHSwapToOtherTx=await v3ETHSwapToOther.wait();
-        console.log("v3ETHSwapToOther success🥳🥳🥳","\n",v3ETHSwapToOtherTx);
+        console.log("V3SwapToNonETH success🥳🥳🥳","\n",v3ETHSwapToOtherTx);
       }catch(e){
         console.log("swap fail:",e);
       }
     }
 
-    await V3Swap(USDCAddress, WETHAddress, 100n*10n**6n);
+    async function V3SwapToETH(token0, token1, amountIn){
+      try{
+        const v3ExactInputParams={
+            index: 0, 
+            tokenIn: token0,
+            tokenOut: token1,
+            recipient: owner.address,
+            amountIn: amountIn,
+            amountOutMinimum: 0,
+            fee: 10000,
+            sqrtPriceLimitX96: 0
+        };
+        const v3ETHSwapToOther=await VizingSwap.v3SwapToETH(v3ExactInputParams);
+        const v3ETHSwapToOtherTx=await v3ETHSwapToOther.wait();
+        console.log("V3SwapToETH success🥳🥳🥳","\n",v3ETHSwapToOtherTx);
+      }catch(e){
+        console.log("swap fail:",e);
+      }
+    }
+
+    async function V3Swap(token0, token1, amountIn){
+      try{
+        const v3ExactInputParams={
+            index: 0, 
+            tokenIn: token0,
+            tokenOut: token1,
+            recipient: owner.address,
+            amountIn: amountIn,
+            amountOutMinimum: 0,
+            fee: 10000,
+            sqrtPriceLimitX96: 0
+        };
+        let ethSwapAmount=0;
+        if(token0 == ADDRESS_ZERO){
+          ethSwapAmount=amountIn;
+        }
+        const v3ETHSwapToOther=await VizingSwap.v3ExactInputSingle(v3ExactInputParams,{value: ethSwapAmount});
+        const v3ETHSwapToOtherTx=await v3ETHSwapToOther.wait();
+        console.log("v3Swap success🥳🥳🥳","\n",v3ETHSwapToOtherTx);
+      }catch(e){
+        console.log("swap fail:",e);
+      }
+    }
+
+    // await V3Swap(ADDRESS_ZERO, USDCAddress, 100n*10n**6n);
+    // await V3Swap(WETHAddress, USDCAddress, 1n*10n**8n);
+    await V3Swap(USDCAddress, ADDRESS_ZERO, 1n*10n**8n);
 
 }
 
