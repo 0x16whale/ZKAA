@@ -5,13 +5,16 @@ import {VizingOmni} from "@vizing/contracts/VizingOmni.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IWETH9} from "../../interfaces/IWETH9.sol";
 import {ISwapRouter02, IV3SwapRouter} from "../../interfaces/uniswapv3/ISwapRouter02.sol";
+import {IEntryPoint, PackedUserOperation} from "../../interfaces/zkaa/IEntryPoint.sol";
+import {IZKVizingAAEvent} from "../../interfaces/IZKVizingAAEvent.sol";
+import {IZKVizingAAError} from "../../interfaces/IZKVizingAAError.sol";
+import {IZKVizingAAStruct} from "../../interfaces/IZKVizingAAStruct.sol";
+import {IUniswapV2Router02} from "../../interfaces/uniswapv2/IUniswapV2Router02.sol";
+
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IVizingSwap} from "../../interfaces/IVizingSwap.sol";
 
-import "../../interfaces/zkaa/IEntryPoint.sol";
-
-contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
+contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IZKVizingAAStruct, IZKVizingAAEvent, IZKVizingAAError{
     using SafeERC20 for IERC20;
 
     address public WETH;
@@ -22,17 +25,18 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
      * @dev Constructs a new BatchSend contract instance.
      * @param _vizingPad The VizingPad for this contract to interact with.
      * @param _owner The owner address that will be set as the owner of the contract.
-     * @param _router Routers[0]=uniswap v3 router
+     * @param _routers Routers[0]=uniswap v3 router, Routers[1]=uniswap v2 router
      */
     constructor(
         address _vizingPad,
         address _owner,
-        address _router
+        address[] memory _routers
     ) VizingOmni(_vizingPad) Ownable(_owner) {
-        routers.push(_router);
+        for(uint256 i; i<_routers.length; i++){
+            routers.push(_routers[i]);
+        }
     }
-    
-    error InvalidData();
+
     mapping(uint64 => address) public mirrorEntryPoint;
     mapping(uint256 => bytes1) public LockWay;
 
@@ -83,7 +87,7 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
     function crossMessage(
         CrossParams calldata params
     ) public payable nonReentrant lock(0) {
-        bytes memory message = abi.encode(params.batchsMessage, params.packCrossMessage);
+        bytes memory message = abi.encode(params.batchsMessage, params.packCrossMessage, params.way);
         bytes memory encodedMessage = _packetMessage(
             mode,
             params.destContract,
@@ -110,9 +114,9 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
 
     /**
      * @notice public swap way.ETH=>Other token，params.tokenIn==address(0), Other token=>ETH, params.tokenOut=address(0)
-     * @param params user swap input v3ExactInputParams
+     * @param params user swap input V3SwapParams
      */
-    function v3Swap(v3ExactInputParams calldata params)public payable nonReentrant lock(1) returns(uint256){
+    function v3Swap(V3SwapParams calldata params)public payable nonReentrant lock(1) returns(uint256){
         address router=routers[params.index];
         address _tokenIn=params.tokenIn;
         address _tokenOut=params.tokenOut;
@@ -153,6 +157,54 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
         return amountOut;
     }
 
+    function v2Swap(V2SwapParams calldata params)public payable nonReentrant returns(uint256){
+        address router=routers[params.index];
+        address fromToken=params.path[0];
+        address toToken=params.path[params.path.length-1];
+        uint256[] memory outputData;
+        address[] memory newPath = new address[](params.path.length);
+        for(uint256 i;i<params.path.length;i++){
+            newPath[i]=params.path[i];
+        }
+        //other swap other
+        if(fromToken!=address(0) && toToken!=address(0)){
+            IERC20(fromToken).safeTransferFrom(msg.sender, address(this), params.amountIn);
+            IERC20(fromToken).approve(router, params.amountIn);
+            outputData=IUniswapV2Router02(router).swapExactTokensForTokens(
+                params.amountIn,
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        //other swap eth
+        }else if(fromToken!=address(0) && toToken==address(0)){
+            newPath[newPath.length-1]=WETH;
+            IERC20(fromToken).safeTransferFrom(msg.sender, address(this), params.amountIn);
+            IERC20(fromToken).approve(router, params.amountIn);
+            outputData=IUniswapV2Router02(router).swapExactTokensForETH(
+                params.amountIn,
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        //eth swap other
+        }else if(fromToken==address(0) && toToken!=address(0)){
+            newPath[0]=WETH;
+            outputData=IUniswapV2Router02(router).swapExactETHForTokens{value: msg.value}(
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        }else{
+            revert InvalidPath();
+        }
+        emit VizingSwapEvent(msg.sender, fromToken, toToken, params.to, params.amountIn, outputData[1]);
+        return outputData[1];
+    }
+
     function _receiveMessage(
         bytes32 messageId,
         uint64 srcChainId,
@@ -160,57 +212,36 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IVizingSwap{
         bytes calldata message
     ) internal virtual override {
         require(mirrorEntryPoint[srcChainId] == address(uint160(srcContract)),"Invalid contract");
-        (bytes memory batchsMessage, bytes memory packCrossMessage) = abi.decode(message, (bytes, bytes));
+        (bytes memory batchsMessage, bytes memory packCrossMessage, uint8 way) = abi.decode(message, (bytes, bytes, uint8));
         PackedUserOperation[] memory userOps = abi.decode(
             batchsMessage,
             (PackedUserOperation[])
         );
-        CrossMessage memory _crossMessage = abi.decode(packCrossMessage, (CrossMessage));
-
+        
         IEntryPoint(mirrorEntryPoint[uint64(block.chainid)]).syncBatch(userOps);
+        uint256 amountOut;
+        if(way == 0){
         
-        if(_crossMessage.way == 0){
-        
-        }else if(_crossMessage.way == 1){
-
-        //v3 swap
-        }else{
-            v3ExactInputParams memory v3Params=v3ExactInputParams({
-                index: _crossMessage.index,
-                fee: _crossMessage.fee,
-                sqrtPriceLimitX96: _crossMessage.sqrtPriceLimitX96,
-                tokenIn: _crossMessage.tokenIn,
-                tokenOut: _crossMessage.tokenOut,
-                recipient: _crossMessage.recipient,
-                amountIn: _crossMessage.amountIn,
-                amountOutMinimum: _crossMessage.amountOutMinimum
-            });
-            uint256 amountOut;
-            try this.v3Swap(v3Params) returns (uint256 result){
+        //v2 swap
+        }else if(way == 1){
+            V2SwapParams memory v2SwapParams = abi.decode(packCrossMessage, (V2SwapParams));
+            try this.v2Swap(v2SwapParams) returns (uint256 result){
                 amountOut = result;
             }catch {
                 amountOut = 0;
             }
+        //v3 swap
+        }else if(way ==2){
+            V3SwapParams memory v3SwapParams = abi.decode(packCrossMessage, (V3SwapParams));
+            try this.v3Swap(v3SwapParams) returns (uint256 result){
+                amountOut = result;
+            }catch {
+                amountOut = 0;
+            }
+        }else{
+            revert InvalidWay();
         }
 
-    }
-
-    function encodeSwapParams(
-        uint8 way,
-        v3ExactInputParams calldata swapParams
-    ) external pure returns (bytes memory crossMessageBytes) {
-        CrossMessage memory _crossMessage = CrossMessage({
-            way: way,
-            index: swapParams.index,
-            fee: swapParams.fee,
-            sqrtPriceLimitX96: swapParams.sqrtPriceLimitX96,
-            tokenIn: swapParams.tokenIn,
-            tokenOut: swapParams.tokenOut,
-            recipient: swapParams.recipient,
-            amountIn: swapParams.amountIn,
-            amountOutMinimum: swapParams.amountOutMinimum
-        });
-        crossMessageBytes = abi.encode(_crossMessage);
     }
 
     function fetchOmniMessageFee(

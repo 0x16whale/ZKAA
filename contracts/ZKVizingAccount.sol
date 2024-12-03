@@ -12,6 +12,7 @@ import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./core/BaseAccount.sol";
 import "./core/Helpers.sol";
 import "./TokenCallbackHandler.sol";
+import "../interfaces/IZKVizingAAError.sol";
 
 /**
  * minimal account.
@@ -23,15 +24,14 @@ contract ZKVizingAccount is
     BaseAccount,
     TokenCallbackHandler,
     UUPSUpgradeable,
-    Initializable
+    Initializable,
+    IZKVizingAAError
 {
-    error InsufficientBalance();
-
     address public owner;
 
     IEntryPoint private immutable _entryPoint;
 
-    event SimpleAccountInitialized(
+    event ZKVizingAccountInitialized(
         IEntryPoint indexed entryPoint,
         address indexed owner
     );
@@ -108,7 +108,7 @@ contract ZKVizingAccount is
 
     /**
      * @dev The _entryPoint member is immutable, to reduce gas consumption.  To upgrade EntryPoint,
-     * a new implementation of SimpleAccount must be deployed with the new EntryPoint address, then upgrading
+     * a new implementation of ZKVizingAccountInitialized must be deployed with the new EntryPoint address, then upgrading
      * the implementation by calling `upgradeTo()`
      * @param anOwner the owner (signer) of this account
      */
@@ -118,7 +118,7 @@ contract ZKVizingAccount is
 
     function _initialize(address anOwner) internal virtual {
         owner = anOwner;
-        emit SimpleAccountInitialized(_entryPoint, owner);
+        emit ZKVizingAccountInitialized(_entryPoint, owner);
     }
 
     // Require the function call went through EntryPoint or owner

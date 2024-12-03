@@ -4,12 +4,14 @@ pragma solidity ^0.8.23;
 import {IUniswapV3Factory} from "../../interfaces/uniswapv3/IUniswapFactory.sol";
 import {ISwapRouter02, IV2SwapRouter, IV3SwapRouter} from "../../interfaces/uniswapv3/ISwapRouter02.sol";
 import {IVizingSwap} from "../../interfaces/IVizingSwap.sol";
+import {IWETH9} from "../../interfaces/IWETH9.sol";
+import {IZKVizingAAEvent} from "../../interfaces/IZKVizingAAEvent.sol";
+import {IUniswapV2Router02} from "../../interfaces/uniswapv2/IUniswapV2Router02.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {IWETH9} from "../../interfaces/IWETH9.sol";
 
-contract VizingSwap is Ownable, ReentrancyGuard, IVizingSwap{
+contract VizingSwap is Ownable, ReentrancyGuard, IVizingSwap, IZKVizingAAEvent{
     using SafeERC20 for IERC20;
 
     address private weth;
@@ -30,7 +32,7 @@ contract VizingSwap is Ownable, ReentrancyGuard, IVizingSwap{
         delete routers[_indexOldRouter];
     }
 
-    function v3ExactInputSingle(v3ExactInputParams calldata params)external payable nonReentrant{
+    function v3ExactInputSingle(V3SwapParams calldata params)external payable nonReentrant{
         address router=routers[params.index];
         address _tokenIn=params.tokenIn;
         address _tokenOut=params.tokenOut;
@@ -67,27 +69,51 @@ contract VizingSwap is Ownable, ReentrancyGuard, IVizingSwap{
         }
         emit VizingSwapEvent(msg.sender, params.tokenIn, params.tokenOut, params.recipient, params.amountIn, amountOut);
     }
-
-    function v2SwapExactTokensForTokens(V2SwapExactTokensForTokensParams calldata params)external payable nonReentrant{
+    
+    function v2Swap(V2SwapParams calldata params)external payable nonReentrant{
         address router=routers[params.index];
-        address tokenIn=params.path[0];
-        uint256 tokenInAmount;
-        if(tokenIn == address(0)){
-            tokenInAmount = msg.value;
-            require(msg.value >= params.amountIn,"Send eth insufficient");
-        }else{
-            tokenInAmount = params.amountIn;
-            IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), tokenInAmount);
-            IERC20(tokenIn).safeIncreaseAllowance(router, tokenInAmount);
-        }
+        address fromToken=params.path[0];
+        address toToken=params.path[params.path.length-1];
 
-        uint256 amountOut=ISwapRouter02(router).swapExactTokensForTokens{value: msg.value}(
-            tokenInAmount,
-            params.amountOutMin,
-            params.path,
-            params.recipient
-        );
-        emit VizingSwapEvent(msg.sender, tokenIn, params.path[params.path.length-1], params.recipient, tokenInAmount, amountOut);
+        address[] memory newPath = new address[](params.path.length);
+        for(uint256 i;i<params.path.length;i++){
+            newPath[i]=params.path[i];
+        }
+        //other swap other
+        if(fromToken!=address(0) && toToken!=address(0)){
+            IERC20(fromToken).safeTransferFrom(msg.sender, address(this), params.amountIn);
+            IERC20(fromToken).approve(router, params.amountIn);
+            IUniswapV2Router02(router).swapExactTokensForTokens(
+                params.amountIn,
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        //other swap eth
+        }else if(fromToken!=address(0) && toToken==address(0)){
+            newPath[newPath.length-1]=weth;
+            IERC20(fromToken).safeTransferFrom(msg.sender, address(this), params.amountIn);
+            IERC20(fromToken).approve(router, params.amountIn);
+            IUniswapV2Router02(router).swapExactTokensForETH(
+                params.amountIn,
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        //eth swap other
+        }else if(fromToken==address(0) && toToken!=address(0)){
+            newPath[0]=weth;
+            IUniswapV2Router02(router).swapExactETHForTokens{value: msg.value}(
+                params.amountOutMin,
+                params.path,
+                params.to,
+                block.timestamp + params.deadline
+            );
+        }else{
+            revert("Invalid path");
+        }
     }
 
     function _getTokenBalance(address _token,address _user)private view returns(uint256 _balance){

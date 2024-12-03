@@ -7,23 +7,6 @@ import "./PackedUserOperation.sol";
  * Deposit is just a balance used to pay for UserOperations (either by a paymaster or an account).
  */
 interface IPreGasManager {
-    error InsufficientBalance();
-    error ValueNotEqual();
-    error CallFailed();
-
-    event DepositTicketAdded(
-        address indexed account,
-        uint256 amount,
-        uint256 timestamp
-    );
-    event WithdrawTicketAdded(
-        address indexed account,
-        uint256 amount,
-        uint256 timestamp
-    );
-    event DepositTicketDeleted(address indexed account, uint256 amount);
-    event WithdrawTicketDeleted(address indexed account, uint256 amount);
-
     /**
      * Get preGasBalance info.
      * @param account - The account to query.

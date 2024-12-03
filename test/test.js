@@ -10,12 +10,15 @@ const {
     const provider = ethers.provider;
     const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000";
   
-    async function DeployEntryPoint() {
+    async function DeployEntryPointAndFactory() {
       const [owner, otherAccount] = await ethers.getSigners();
       const entryPoint = await ethers.getContractFactory("EntryPoint");
       const EntryPoint = await entryPoint.deploy();
+      const zkVizingAccountFactory=await ethers.getContractFactory("ZKVizingAccountFactory");
+      const ZKVizingAccountFactory=await zkVizingAccountFactory.deploy(EntryPoint);
+      console.log("ZKVizingAccountFactory:",ZKVizingAccountFactory.target);
       console.log("EntryPoint:",EntryPoint.target);
-      return { EntryPoint };
+      return { EntryPoint, ZKVizingAccountFactory };
     }
 
     async function DeployLibrary(){
@@ -30,8 +33,9 @@ const {
         const [owner, otherAccount] = await ethers.getSigners();
         const base_vizingPad="0x0B5a8E5494DDE7039781af500A49E7971AE07a6b";
         const base_router="0x94cC0AaC535CCDB3C01d6787D6413C739ae12bc4";
+        const routers=[base_router, base_router];
         const syncRouter = await ethers.getContractFactory("SyncRouter");
-        const SyncRouter = await syncRouter.deploy(base_vizingPad, owner, base_router);
+        const SyncRouter = await syncRouter.deploy(base_vizingPad, owner, routers);
         console.log("SyncRouter:",SyncRouter.target);
         return { SyncRouter };
     }
@@ -43,26 +47,15 @@ const {
         return { WETH };
     }
     
-    async function DeployZKVizingAccountFactory(thisEntryPoint){
-      const zkVizingAccountFactory=await ethers.getContractFactory("ZKVizingAccountFactory");
-      const ZKVizingAccountFactory=await zkVizingAccountFactory.deploy(thisEntryPoint);
-      console.log("ZKVizingAccountFactory:",ZKVizingAccountFactory.target);
-      return {ZKVizingAccountFactory};
-    }
-    
     let EntryPoint;
     let WETH;
     let SyncRouter;
     let ZKVizingAccountFactory;
   
     describe("Deploy", function () {
-      it("EntryPoint and WETH", async function () {
-        EntryPoint = await DeployEntryPoint();
+      it("EntryPoint and Factory and WETH", async function () {
+        ({ EntryPoint, ZKVizingAccountFactory } = await loadFixture(DeployEntryPointAndFactory));
         WETH = await DeployWETH();
-      });
-
-      it("ZKVizingAccountFactory", async function () {
-        ZKVizingAccountFactory = await DeployZKVizingAccountFactory(EntryPoint);
       });
 
       it("SyncRouter", async function () {

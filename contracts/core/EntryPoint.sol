@@ -9,6 +9,7 @@ import "../../interfaces/zkaa/IPaymaster.sol";
 import "../../interfaces/zkaa/IEntryPoint.sol";
 import "../../interfaces/zkaa/IVerifyManager.sol";
 import "../../interfaces/zkaa/ISyncRouter.sol";
+import "../../interfaces/IZKVizingAAStruct.sol";
 
 import "../utils/Exec.sol";
 import "./SmtManager.sol";
@@ -29,6 +30,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 /// @custom:security-contact https://bounty.ethereum.org
 contract EntryPoint is
     IEntryPoint,
+    IZKVizingAAStruct,
     SmtManager,
     PreGasManager,
     ConfigManager,
@@ -328,30 +330,6 @@ contract EntryPoint is
                 _compensate(beneficiary, collected);
             }
         }
-    }
-
-    /**
-     * A memory copy of UserOp static fields only.
-     * Excluding: userAddr, chainId, callData. Replacing paymasterAndData with paymaster.
-     */
-    struct MemoryUserOp {
-        address sender;
-        uint256 chainId;
-        uint256 operationValue;
-        uint64 zkVerificationGasLimit;
-        uint64 mainChainGasLimit;
-        uint64 destChainGasLimit;
-        uint128 mainChainGasPrice;
-        uint128 destChainGasPrice;
-    }
-    
-
-    struct UserOpInfo {
-        MemoryUserOp mUserOp;
-        bytes32 userOpHash;
-        uint256 prefund;
-        uint256 contextOffset;
-        uint256 preOpGas;
     }
 
     /**

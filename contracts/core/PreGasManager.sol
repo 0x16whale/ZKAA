@@ -2,10 +2,11 @@
 pragma solidity ^0.8.24;
 
 import "../../interfaces/zkaa/IPreGasManager.sol";
-
+import "../../interfaces/IZKVizingAAError.sol";
+import "../../interfaces/IZKVizingAAEvent.sol";
 import "./UserOperationLib.sol";
 
-contract PreGasManager is IPreGasManager {
+contract PreGasManager is IPreGasManager, IZKVizingAAError, IZKVizingAAEvent {
     using UserOperationLib for PackedUserOperation;
 
     mapping(address account => uint256 amount) public preGasBalance;
