@@ -61,7 +61,7 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IZKVizingAAStruct, 
 
     /**
      * @notice owner set lock
-     * @param _way crossMessage==0, uniswapV3==1
+     * @param _way lock crossMessage==0, uniswapV3==1, uniswapV2==2
      * @param _lockState _lockState=0x00==unlock, _lockState!=0x00==locked
      */
     function setLock(uint256 _way, bytes1 _lockState) external onlyOwner {
@@ -157,7 +157,7 @@ contract SyncRouter is VizingOmni, Ownable, ReentrancyGuard, IZKVizingAAStruct, 
         return amountOut;
     }
 
-    function v2Swap(V2SwapParams calldata params)public payable nonReentrant returns(uint256){
+    function v2Swap(V2SwapParams calldata params)public payable nonReentrant lock(2) returns(uint256){
         address router=routers[params.index];
         address fromToken=params.path[0];
         address toToken=params.path[params.path.length-1];

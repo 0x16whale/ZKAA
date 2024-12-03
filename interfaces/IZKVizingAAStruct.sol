@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 interface IZKVizingAAStruct{
+    /************************************************EntryPoint*********************************************************** */
 
     /**
      * A memory copy of UserOp static fields only.
@@ -26,9 +27,10 @@ interface IZKVizingAAStruct{
         uint256 contextOffset;
         uint256 preOpGas;
     }
-    
+
 
     /************************************************SyncRouter*********************************************************** */
+    
     /**
      * @notice Use any uniswapV3 router for swap
      * @param index                 - Index router
