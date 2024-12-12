@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import "../../interfaces/zkaa/IPreGasManager.sol";
-import "../../interfaces/IZKVizingAAError.sol";
-import "../../interfaces/IZKVizingAAEvent.sol";
-import "./UserOperationLib.sol";
+import "../libraries/Error.sol";
+import "../libraries/UserOperationLib.sol";
+import "../interfaces/core/IPreGasManager.sol";
 
-contract PreGasManager is IPreGasManager, IZKVizingAAError, IZKVizingAAEvent {
+contract PreGasManager is IPreGasManager {
     using UserOperationLib for PackedUserOperation;
 
     mapping(address account => uint256 amount) public preGasBalance;
@@ -21,14 +20,31 @@ contract PreGasManager is IPreGasManager, IZKVizingAAError, IZKVizingAAEvent {
     /**
      * Submit a user deposit operation and redeem deposit to SMT
      */
-    function submitDepositOperation(uint256 amount) external payable {
+    function submitDepositOperation(
+        uint256 amount,
+        uint256 nonce
+    ) external payable {
         if (msg.value != amount) {
             revert ValueNotEqual();
         }
 
         preGasBalance[msg.sender] += amount;
 
-        redeemGasOperation(amount);
+        redeemGasOperation(msg.sender, amount, nonce);
+    }
+
+    function _submitDepositOperationRemote(
+        address sender,
+        uint256 amount,
+        uint256 nonce
+    ) internal {
+        if (msg.value != amount) {
+            revert ValueNotEqual();
+        }
+
+        preGasBalance[sender] += amount;
+
+        redeemGasOperation(sender, amount, nonce);
     }
 
     /**
@@ -76,10 +92,19 @@ contract PreGasManager is IPreGasManager, IZKVizingAAError, IZKVizingAAEvent {
     /**
      * Redeem gasBalance to SMT
      */
-    function redeemGasOperation(uint256 amount) public {
-        if (preGasBalance[msg.sender] < amount) {
+    function redeemGasOperation(
+        address sender,
+        uint256 amount,
+        uint256 nonce
+    ) internal {
+        if (preGasBalance[sender] < amount) {
             revert InsufficientBalance();
         }
-        emit DepositTicketAdded(msg.sender, amount, block.timestamp);
+        emit DepositTicketAdded(
+            keccak256(abi.encodePacked(sender, block.chainid, nonce, amount)),
+            sender,
+            amount,
+            block.timestamp
+        );
     }
 }

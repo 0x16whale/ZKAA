@@ -1,33 +1,47 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import "./ZKVizingAccount.sol";
 
 /**
- * A sample factory contract for ZKVizingAccount
+ * A factory contract for ZKVizingAccount
  * A UserOperations "initCode" holds the address of the factory, and a method call (to createAccount, in this sample factory).
  * The factory's createAccount returns the target account address even if it is already installed.
  * This way, the entryPoint.getSenderAddress() can be called either before or after the account is created.
  */
-contract ZKVizingAccountFactory {
-    uint256 public UserId;
+contract ZKVizingAccountFactory is Ownable {
+    struct UserZKVizingAccountInfo {
+        uint256 userId;
+        bytes1 state;
+        address zkVizingAccount;
+    }
 
     event AccountCreated(address indexed account, address owner);
+
+    uint256 public UserId;
+
     ZKVizingAccount public immutable accountImplementation;
 
-    constructor(IEntryPoint _entryPoint) {
+    address internal bundler;
+
+    mapping(address => UserZKVizingAccountInfo)
+        private _UserZKVizingAccountInfo;
+
+    modifier onlyBundler() {
+        require(msg.sender == bundler);
+        _;
+    }
+
+    constructor(IEntryPoint _entryPoint) Ownable(msg.sender) {
         accountImplementation = new ZKVizingAccount(_entryPoint);
     }
 
-    struct UserZKVizingAccountInfo{
-        uint256 userId;
-        bytes1 state; 
-        address zkVizingAccount;
+    function updateBundler(address _bundler) external onlyOwner {
+        bundler = _bundler;
     }
-    mapping(address => UserZKVizingAccountInfo)private _UserZKVizingAccountInfo;
 
     /**
      * create an account, and return its address.
@@ -37,8 +51,11 @@ contract ZKVizingAccountFactory {
      */
     function createAccount(
         address owner
-    ) public returns (ZKVizingAccount ret) {
-        require(_UserZKVizingAccountInfo[owner].state != 0x01,"Already create");
+    ) public onlyBundler returns (ZKVizingAccount ret) {
+        require(
+            _UserZKVizingAccountInfo[owner].state != 0x01,
+            "Already create"
+        );
         ret = ZKVizingAccount(
             payable(
                 new ERC1967Proxy{salt: bytes32(UserId)}(
@@ -47,9 +64,9 @@ contract ZKVizingAccountFactory {
                 )
             )
         );
-        address zkVizingAccountAddress=address(ret);
-        require(zkVizingAccountAddress!=address(0));
-        _UserZKVizingAccountInfo[owner]=UserZKVizingAccountInfo({
+        address zkVizingAccountAddress = address(ret);
+        require(zkVizingAccountAddress != address(0));
+        _UserZKVizingAccountInfo[owner] = UserZKVizingAccountInfo({
             userId: UserId,
             state: 0x01,
             zkVizingAccount: zkVizingAccountAddress
@@ -80,7 +97,9 @@ contract ZKVizingAccountFactory {
             );
     }
 
-    function getUserAccountInfo(address _owner)external view returns(UserZKVizingAccountInfo memory){
+    function getUserAccountInfo(
+        address _owner
+    ) external view returns (UserZKVizingAccountInfo memory) {
         return _UserZKVizingAccountInfo[_owner];
     }
 }

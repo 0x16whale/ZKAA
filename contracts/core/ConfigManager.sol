@@ -1,44 +1,56 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.24;
 
-contract ConfigManager {
+import "../interfaces/core/IConfigManager.sol";
+
+contract ConfigManager is IConfigManager {
+    error NumberIsNotEqual();
+
+    uint64 internal constant MAIN_CHAINID = 31337;
+
     address public syncRouter;
     address public verifier;
 
-    uint32[] public dstEids;
-
-    uint256 internal dstCoeffGas;
-    uint256 internal dstConGas;
+    mapping(uint64 => Config) internal chainConfigs;
 
     modifier isOwner() {
         _isOwner();
         _;
     }
 
-    modifier isSyncRouter() {
-        require(msg.sender == syncRouter, "NEQSRR");
+    modifier isSyncRouter(uint64 chainId) {
+        require(msg.sender == chainConfigs[chainId].router, "NEQSR");
         _;
     }
 
     function _isOwner() internal virtual {}
 
-    function updateSyncRouter(address _syncRouter) external isOwner {
-        syncRouter = _syncRouter;
+    function getMainChainId() public pure returns (uint64) {
+        return MAIN_CHAINID;
+    }
+
+    function getChainConfigs(
+        uint64 chainId
+    ) public view returns (Config memory) {
+        return chainConfigs[chainId];
     }
 
     function updateVerifier(address _verifier) external isOwner {
         verifier = _verifier;
     }
 
-    function updateDstEids(uint32[] calldata _dstEids) external isOwner {
-        dstEids = _dstEids;
-    }
-
-    function updateDstCoeffGas(uint256 _dstCoeffGas) external isOwner {
-        dstCoeffGas = _dstCoeffGas;
-    }
-
-    function updateDstConGas(uint256 _dstConGas) external isOwner {
-        dstConGas = _dstConGas;
+    function updateChainConfigs(
+        uint64[] calldata _chainIds,
+        Config[] calldata _config
+    ) external isOwner {
+        if (_chainIds.length != _config.length) {
+            revert NumberIsNotEqual();
+        }
+        unchecked {
+            for (uint256 i = 0; i < _chainIds.length; ) {
+                chainConfigs[_chainIds[i]] = _config[i];
+                ++i;
+            }
+        }
     }
 }

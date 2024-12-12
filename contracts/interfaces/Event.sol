@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.23;
 
-interface IZKVizingAAEvent{
-    /************************************************SyncRouter*********************************************************** */
+interface Event {
+
+
+    /************************************************VzingSwap*********************************************************** */
 
     /**
-     * Touch uniswapV3 hook to swap  
+     * Touch uniswap hook to swap
      * @param sender      - Touch swap sender.
      * @param tokenIn     - Touch swap input token(tokenIn==address(0)=>eth)
      * @param tokenOut    - Touch swap output token(tokenOut==address(0)=>eth)
@@ -21,6 +23,26 @@ interface IZKVizingAAEvent{
         uint256 amountIn,
         uint256 amountOut
     );
+
+    /**
+     * Return user error funds event
+     * @param token      - Touch swap sender.
+     * @param receiver     - Touch swap input token(tokenIn==address(0)=>eth)
+     * @param amount    - Touch swap output token(tokenOut==address(0)=>eth)
+     */
+    event RefundEvent(address indexed token, address indexed receiver, uint256 amount);
+
+    /************************************************SyncRouter*********************************************************** */
+
+    
+
+    /**
+     * Target chain touch hook
+     * @param success      - Touch hook if success
+     * @param data     - Touch call hook return data
+     * @param packHookMessage    - source chain hook message
+     */
+    event ReceiveTouchHook(bool success, bytes data, bytes packHookMessage);
 
     /************************************************PreGasManager*********************************************************** */
 
@@ -109,6 +131,4 @@ interface IZKVizingAAEvent{
      * Any event emitted before this event, is part of the validation.
      */
     event BeforeExecution();
-
-
 }
