@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IUniswapV3Factory} from "../interfaces/uniswapv3/IUniswapFactory.sol";
 import {ISwapRouter02, IV2SwapRouter, IV3SwapRouter} from "../interfaces/uniswapv3/ISwapRouter02.sol";
-import {BaseStruct} from "../interfaces/BaseStruct.sol";
+import {BaseStruct} from "../interfaces/core/BaseStruct.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 import {Event} from "../interfaces/Event.sol";
 import {IUniswapV2Router02} from "../interfaces/uniswapv2/IUniswapV2Router02.sol";

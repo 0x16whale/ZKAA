@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.23;
 
 error InsufficientBalance();
 
@@ -14,6 +14,16 @@ error InvalidPath();
 error InvalidWay();
 
 error ExecutionCompleted();
+
+error NotFromEP();
+
+error AAGasValueOverflow();
+
+error OldAccInputHashDoesNotExist();
+
+error NewAccInputHashDoesNotExist();
+
+error NewStateRootNotInsidePrime();
 
 /**
  * A custom revert error of handleOps, to identify the offending op.

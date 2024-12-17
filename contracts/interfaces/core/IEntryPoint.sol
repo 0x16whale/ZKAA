@@ -19,6 +19,9 @@ interface IEntryPoint is IPreGasManager, IConfigManager {
      * An event emitted after each successful request.
      * @param userOpHash    - Unique identifier for the request (hash its entire content, except signature).
      * @param sender        - The account that generates this request.
+     * @param owner         - The owner of account.
+     * @param phase         - Execution phase of op.
+     * @param innerExec     - If op has inner op.
      * @param success       - True if the sender transaction succeeded, false if reverted.
      * @param actualGasCost - Actual amount paid (by account or paymaster) for this UserOperation.
      * @param actualGasUsed - Total gas used by this UserOperation (including preVerification, creation,
@@ -27,6 +30,9 @@ interface IEntryPoint is IPreGasManager, IConfigManager {
     event UserOperationEvent(
         bytes32 indexed userOpHash,
         address indexed sender,
+        address owner,
+        uint8 phase,
+        bool innerExec,
         bool success,
         uint256 actualGasCost,
         uint256 actualGasUsed
@@ -114,10 +120,11 @@ interface IEntryPoint is IPreGasManager, IConfigManager {
 
     error NotSupportChainId();
 
-    error OldAccInputHashDoesNotExist();
-    error NewAccInputHashDoesNotExist();
-    error NewStateRootNotInsidePrime();
     error InvalidProof();
+
+    function estimateCrossMessageParamsCrossGas(
+        CrossMessageParams calldata params
+    ) external view returns (uint256);
 
     function submitDepositOperationByRemote(
         address sender,
@@ -125,7 +132,7 @@ interface IEntryPoint is IPreGasManager, IConfigManager {
         uint256 nonce
     ) external payable;
 
-    function sendDepositOperation(
+    function sendUserOmniMessage(
         CrossMessageParams calldata params
     ) external payable;
 
@@ -183,4 +190,8 @@ interface IEntryPoint is IPreGasManager, IConfigManager {
      * @param data data to pass to target in a delegatecall
      */
     function delegateAndRevert(address target, bytes calldata data) external;
+
+    function getChainConfigs(
+        uint64 chainId
+    ) external view returns (Config memory);
 }

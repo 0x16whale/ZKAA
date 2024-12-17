@@ -1,11 +1,7 @@
 const hre = require("hardhat");
 
-const ERC20ABI = require("../artifacts/contracts/TestToken.sol/TestToken.json");
-const WETHABI = require("../artifacts/contracts/WETH.sol/WETH9.json");
 const EntryPointABI = require("../artifacts/contracts/core/EntryPoint.sol/EntryPoint.json");
-const ZKVizingAccountFactoryABI = require("../artifacts/contracts/ZKVizingAccountFactory.sol/ZKVizingAccountFactory.json");
-const SyncRouterABI = require("../artifacts/contracts/core/SyncRouter/SyncRouter.sol/SyncRouter.json");
-const VizingSwapABI = require("../artifacts/contracts/hook/VizingSwap.sol/VizingSwap.json");
+const ZKVizingAccountFactoryABI=require("../artifacts/contracts/ZKVizingAccountFactory.sol/ZKVizingAccountFactory.json");
 const setup = require("../setup/setup.json");
 const { Network } = require("inspector");
 
@@ -62,31 +58,20 @@ async function main() {
     let networkData=deployedAddresses[networkName]
     console.log("Network Data:", networkData);
 
-    const SyncRouter = new ethers.Contract(
-        networkData.SyncRouter,
-        SyncRouterABI.abi,
-        deployer
+    const ZKVizingAccountFactory = new ethers.Contract(
+        networkData.ZKVizingAccountFactory,
+        ZKVizingAccountFactoryABI.abi,
+        owner
     );
 
-    const VizingSwap = new ethers.Contract(
-        networkData.VizingSwap,
-        VizingSwapABI.abi,
-        deployer
-    );
-
-    {
-        const transferOwner1=await SyncRouter.transferOwnership(owner.address);
-        await transferOwner1.wait();
-        console.log("SyncRouter transferOwner success");
+    {   
+        // const newBundler="0x38bb2C8050374fcD3864d67838e0314Fa5469714";  //font
+        const newBundler="0x83370B380f74ce34c72ABcb8B485E3Fa56907D46";  //
         
-        const transferManager=await VizingSwap.setManager(owner.address);
-        await transferManager.wait();
-        console.log("VizingSwap setManager success");
-
-        const transferOwner2=await VizingSwap.transferOwnership(owner.address);
-        await transferOwner2.wait();
-        console.log("VizingSwap transferOwner success");
-
+        // const newBundler="0xaE67336f06B10fbbb26F31d31AbEA897290109B9";
+        const updateBundler=await ZKVizingAccountFactory.updateBundler(newBundler);
+        await updateBundler.wait();
+        console.log("Update Bundler success");
     }
 
 }

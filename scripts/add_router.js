@@ -4,7 +4,7 @@ const ERC20ABI = require("../artifacts/contracts/TestToken.sol/TestToken.json");
 const WETHABI = require("../artifacts/contracts/WETH.sol/WETH9.json");
 const EntryPointABI = require("../artifacts/contracts/core/EntryPoint.sol/EntryPoint.json");
 const ZKVizingAccountFactoryABI = require("../artifacts/contracts/ZKVizingAccountFactory.sol/ZKVizingAccountFactory.json");
-const SyncRouterABI = require("../artifacts/contracts/core/SyncRouter.sol/SyncRouter.json");
+const SyncRouterABI = require("../artifacts/contracts/core/SyncRouter/SyncRouter.sol/SyncRouter.json");
 const VizingSwapABI = require("../artifacts/contracts/hook/VizingSwap.sol/VizingSwap.json");
 const setup = require("../setup/setup.json");
 const { Network } = require("inspector");
@@ -19,9 +19,6 @@ async function main() {
 
     const ownerETHBalance = await provider.getBalance(owner.address);
     console.log("ownerETHBalance:", ownerETHBalance);
-
-    const testUserETHBalance = await provider.getBalance(testUser.address);
-    console.log("testUserETHBalance:", testUserETHBalance);
 
     const network = await provider.getNetwork();
     const currentChainId = network.chainId;

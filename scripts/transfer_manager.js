@@ -62,31 +62,16 @@ async function main() {
     let networkData=deployedAddresses[networkName]
     console.log("Network Data:", networkData);
 
-    const SyncRouter = new ethers.Contract(
-        networkData.SyncRouter,
-        SyncRouterABI.abi,
-        deployer
-    );
-
     const VizingSwap = new ethers.Contract(
         networkData.VizingSwap,
         VizingSwapABI.abi,
-        deployer
+        owner
     );
 
     {
-        const transferOwner1=await SyncRouter.transferOwnership(owner.address);
-        await transferOwner1.wait();
-        console.log("SyncRouter transferOwner success");
-        
         const transferManager=await VizingSwap.setManager(owner.address);
         await transferManager.wait();
         console.log("VizingSwap setManager success");
-
-        const transferOwner2=await VizingSwap.transferOwnership(owner.address);
-        await transferOwner2.wait();
-        console.log("VizingSwap transferOwner success");
-
     }
 
 }

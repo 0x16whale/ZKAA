@@ -5,7 +5,7 @@ const ERC20ABI = require("../artifacts/contracts/TestToken.sol/TestToken.json");
 const WETHABI = require("../artifacts/contracts/WETH.sol/WETH9.json");
 const EntryPointABI = require("../artifacts/contracts/core/EntryPoint.sol/EntryPoint.json");
 const ZKVizingAccountFactoryABI = require("../artifacts/contracts/ZKVizingAccountFactory.sol/ZKVizingAccountFactory.json");
-const SyncRouterABI = require("../artifacts/contracts/core/SyncRouter.sol/SyncRouter.json");
+const SyncRouterABI = require("../artifacts/contracts/core/SyncRouter/SyncRouter.sol/SyncRouter.json");
 
 const setup = require("../setup/setup.json");
 const { Network } = require("inspector");
@@ -147,7 +147,27 @@ async function main() {
 
 
 /*********************************************Deploy********************************************************** */
+    let UserOperationLibAddress;
+    let UserOperationsLibAddress;
+    async function DeployUserOperationLib() {
+        const userOperationLib = await ethers.getContractFactory("UserOperationLib");
+        const UserOperationLib = await userOperationLib.deploy();
+        UserOperationLibAddress = UserOperationLib.target;
+        console.log("UserOperationLib:", UserOperationLibAddress);
+        
+        const userOperationsLib = await ethers.getContractFactory("UserOperationsLib");
+        const UserOperationsLib = await userOperationsLib.deploy();
+        UserOperationsLibAddress = UserOperationsLib.target;
+        console.log("UserOperationsLib:", UserOperationsLibAddress);
+    }
+
     async function DeployEntryPoint() {
+        // await DeployUserOperationLib();
+        // const entryPoint = await ethers.getContractFactory("EntryPoint", {
+        //     libraries:{
+        //         UserOperationLib: UserOperationLibAddress
+        //     }
+        // });
         const entryPoint = await ethers.getContractFactory("EntryPoint");
         EntryPoint = await entryPoint.deploy();
         EntryPointAddress = EntryPoint.target;
@@ -253,14 +273,14 @@ async function main() {
             let currentSetChainId=BigInt(setup["VizingPad-TestNet"][i].ChainId);
             console.log("currentSetChainId:", currentSetChainId);
             if(currentSetChainId === currentChainId){
-                // await DeployEntryPoint();
-                // await DeployZKVizingAccountFactory(EntryPointAddress);
+                await DeployEntryPoint();
+                await DeployZKVizingAccountFactory(EntryPointAddress);
                 
                 // await DeployWETH();
                 await DeployVizingSwap(WETHAddress);
                 await DeploySyncRouter(setup["VizingPad-TestNet"][i].Address, WETHAddress, VizingSwapAddress);
-                // await DeploySenderCreator();
-                // await DeployZKVizingAADataHelp();
+                await DeploySenderCreator();
+                await DeployZKVizingAADataHelp();
 
                 //create zkaa account
                 let createdZKAccount=ADDRESS_ZERO;
